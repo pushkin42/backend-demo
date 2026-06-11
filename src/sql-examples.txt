@@ -1,0 +1,111 @@
+BEGIN
+  DECLARE done INT DEFAULT 0;
+  DECLARE item_id INT;
+  DECLARE cur CURSOR FOR SELECT catalog_items.id FROM catalog_items WHERE NAME LIKE CONCAT('%',items_like,'%');
+  DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+Open cur;
+WHILE not done  DO 
+FETCH cur INTO item_id;
+INSERT INTO catalog_category_item_pivot(catalog_category_id, catalog_item_id) VALUES (category_id, item_id);
+END WHILE;
+Close cur; 
+END
+
+------
+
+BEGIN
+    START TRANSACTION;
+
+    -- 1. Сложить quantity для совпадающих товаров
+    UPDATE cart_items tgt
+    JOIN cart_items src
+      ON src.catalog_item_id = tgt.catalog_item_id
+     AND (
+            (from_type = 'session' AND src.session_id = from_id)
+         OR (from_type = 'user'    AND src.user_id    = from_id)
+         )
+     AND (
+            (to_type = 'session' AND tgt.session_id = to_id)
+         OR (to_type = 'user'    AND tgt.user_id    = to_id)
+         )
+    SET tgt.quantity = tgt.quantity + src.quantity, tgt.cart_id=0;
+
+    -- 2. Перенести уникальные позиции
+    UPDATE cart_items src
+    LEFT JOIN cart_items tgt
+      ON tgt.catalog_item_id = src.catalog_item_id
+     AND (
+            (to_type = 'session' AND tgt.session_id = to_id)
+         OR (to_type = 'user'    AND tgt.user_id    = to_id)
+         )
+    SET
+        src.user_id    = IF(to_type='user', to_id, NULL),
+        src.session_id= IF(to_type='session', to_id, NULL),
+        src.cart_id=0
+    WHERE
+        tgt.id IS NULL
+        AND (
+            (from_type='session' AND src.session_id = from_id)
+         OR (from_type='user'    AND src.user_id    = from_id)
+        );
+
+    -- 3. Удалить дубликаты источника
+    DELETE src
+    FROM cart_items src
+    JOIN cart_items tgt
+      ON tgt.catalog_item_id = src.catalog_item_id
+     AND (
+            (to_type = 'session' AND tgt.session_id = to_id)
+         OR (to_type = 'user'    AND tgt.user_id    = to_id)
+         )
+    WHERE
+        (
+            (from_type='session' AND src.session_id = from_id)
+         OR (from_type='user'    AND src.user_id    = from_id)
+        );
+
+    COMMIT;
+END
+
+-------
+
+BEGIN
+
+   SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+   
+   IF (SELECT `value` FROM `laravel_new_040126`.`status` WHERE param='bx_import_active' LIMIT 1)=0 THEN
+
+	REPLACE INTO global_stats_and_config (id, NAME, data_type, VALUE, updated_at) VALUES (1, 'items_available', 'stats', (
+			SELECT CAST(COUNT(id) AS JSON)
+			FROM catalog_items
+			WHERE cf_actual_quantity>0 AND ((cf_price_r>0) AND (cf_price_o>0))
+		) 
+		, CURRENT_TIMESTAMP
+	);
+	REPLACE INTO global_stats_and_config (id, NAME, data_type, VALUE, updated_at) VALUES (2, 'items_available_with_zero', 'stats', (
+			SELECT CAST(COUNT(id) AS JSON)
+			FROM catalog_items
+			WHERE cf_actual_quantity>=0 AND ((cf_price_r>0) AND (cf_price_o>0))
+		) 
+		, CURRENT_TIMESTAMP
+	);
+	
+	END IF;
+
+   SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+
+END
+
+-------
+
+WITH RECURSIVE `category_tree` AS (
+SELECT `catalog_categories`.`id` AS `category_id`,`catalog_categories`.`id` AS `root_id`
+FROM `catalog_categories` UNION ALL
+SELECT `c`.`id` AS `category_id`,`ct`.`root_id` AS `root_id`
+FROM (`catalog_categories` `c`
+JOIN `category_tree` `ct` ON((`c`.`parent_id` = `ct`.`category_id`))))
+SELECT `ct`.`root_id` AS `category_id`,`cp`.`catalog_item_id` AS `catalog_item_id`,`cp`.`catalog_category_id` AS `actual_category_id`
+FROM (`category_tree` `ct`
+JOIN `catalog_category_item_pivot` `cp` ON((`cp`.`catalog_category_id` = `ct`.`category_id`)))
+
+--------
