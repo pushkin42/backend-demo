@@ -7,8 +7,8 @@
 
 # Что тут есть
 
-DTO - примеры Data transfer objects
-Services - примеры сервисов
+- DTO - примеры Data transfer objects
+- Services - примеры сервисов
 -  Parsers - примеры классов, работающих с CommerceML (разбор данных)
 -  FileHashesCalculator - калькулятор хешей для изображений (используется в парсерах CommerceML)
 -  Helpers - примеры универсальных классов для работы с данными
