@@ -133,6 +133,8 @@ abstract class ProductGroupRule extends BaseRule
                             $ret = $this->matchMeasure($measure, $k, $v);
                         }
                     } catch (Throwable $e) {
+                        // модуль в разработке, поэтому dd можно. здесь разобраны не все возможные варианты замен,
+                        // поэтому есть вероятность что парсер где-то может споткнуться
                         dd($matches, $e, $k, $v, $measure);
                     }
 
