@@ -206,3 +206,74 @@ BEGIN
     
     DROP TEMPORARY TABLE _agg;
 END
+
+-------
+
+CREATE TABLE `statistic_entries` (
+	`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	`ip` VARCHAR(20) NOT NULL COMMENT 'IP адрес клиента' COLLATE 'utf8mb4_unicode_ci',
+	`hostname` VARCHAR(255) NULL DEFAULT NULL COMMENT 'Имя хоста клиента' COLLATE 'utf8mb4_unicode_ci',
+	`cookies` JSON NULL DEFAULT NULL COMMENT 'Заголовок cookie из запроса',
+	`lang` JSON NULL DEFAULT NULL COMMENT 'Заголовок accept-language из запроса',
+	`encoding` JSON NULL DEFAULT NULL COMMENT 'Заголовок accept-encoding из запроса',
+	`referer` TEXT NULL DEFAULT NULL COMMENT 'Заголовок referer из запроса' COLLATE 'utf8mb4_unicode_ci',
+	`host` VARCHAR(255) NULL DEFAULT NULL COMMENT 'Заголовок host из запроса' COLLATE 'utf8mb4_unicode_ci',
+	`method` VARCHAR(20) NULL DEFAULT NULL COMMENT 'Метод запроса' COLLATE 'utf8mb4_unicode_ci',
+	`platform` VARCHAR(255) NULL DEFAULT NULL COMMENT 'Платформа клиента (windows/linux/etc)' COLLATE 'utf8mb4_unicode_ci',
+	`is_mobile` TINYINT(1) NULL DEFAULT NULL COMMENT 'Мобильное устройство',
+	`is_bot` TINYINT(1) NULL DEFAULT NULL COMMENT 'Это бот',
+	`ua` VARCHAR(2048) NULL DEFAULT NULL COMMENT 'User agent клиента' COLLATE 'utf8mb4_unicode_ci',
+	`dnt` TINYINT(1) NULL DEFAULT NULL COMMENT 'Есть ли заголовок do not track',
+	`location` JSON NULL DEFAULT NULL COMMENT 'Координаты устройства клиента (если доступно)',
+	`city` VARCHAR(255) NULL DEFAULT NULL COMMENT 'Город клиента' COLLATE 'utf8mb4_unicode_ci',
+	`query` TEXT NULL DEFAULT NULL COMMENT 'Строка запроса' COLLATE 'utf8mb4_unicode_ci',
+	`user_id` BIGINT UNSIGNED NULL DEFAULT NULL COMMENT 'ID пользователя (если авторизован)',
+	`session_id` VARCHAR(255) NULL DEFAULT NULL COMMENT 'ID сессии (внутреннее значение)' COLLATE 'utf8mb4_unicode_ci',
+	`data` JSON NULL DEFAULT NULL COMMENT 'Дополнительные данные',
+	`counter` BIGINT UNSIGNED NULL DEFAULT '0' COMMENT 'Счетчик повторов',
+	`response_code` SMALLINT NULL DEFAULT NULL COMMENT 'Код ответа',
+	`response_text` VARCHAR(700) NULL DEFAULT NULL COMMENT 'Текст ответа (если ошибка)' COLLATE 'utf8mb4_unicode_ci',
+	`created_at` TIMESTAMP NULL DEFAULT NULL,
+	`updated_at` TIMESTAMP NULL DEFAULT NULL,
+	`deleted_at` TIMESTAMP NULL DEFAULT NULL,
+	`country_code` VARCHAR(10) NULL DEFAULT NULL COMMENT 'Код страны (RU/EN...)' COLLATE 'utf8mb4_unicode_ci',
+	`country` VARCHAR(255) NULL DEFAULT NULL COMMENT 'Страна (если определено)' COLLATE 'utf8mb4_unicode_ci',
+	`bl_data_honeypot` JSON NULL DEFAULT NULL COMMENT 'Данные DNS honeypot project',
+	`bl_data_abuseip` JSON NULL DEFAULT NULL COMMENT 'Данные ABUSEIPDB',
+	`usage_type` VARCHAR(255) NULL DEFAULT NULL COMMENT 'Класс хоста (по версии ABUSEIPDB)' COLLATE 'utf8mb4_unicode_ci',
+	`wrong_host` TINYINT(1) NULL DEFAULT '0' COMMENT 'Хост не совпадает с сайтом',
+	`score` INT NULL DEFAULT '0' COMMENT 'Индекс "вредности"',
+	`report_count` INT NULL DEFAULT '0' COMMENT 'Количество жалоб',
+	`last_reported_at` TIMESTAMP NULL DEFAULT NULL COMMENT 'Дата и время последней жалобы',
+	`whitelisted` TINYINT NULL DEFAULT NULL COMMENT 'В белом списке abuseip',
+	`query_hash_sha1_binary` VARBINARY(20) AS (unhex(sha(`query`))) stored COMMENT 'Хеш sha1 для url (в HEX виде)',
+	PRIMARY KEY (`id`) USING BTREE,
+	INDEX `statistic_entries_user_id_foreign` (`user_id`) USING BTREE,
+	INDEX `ip` (`ip`) USING BTREE,
+	INDEX `hostname` (`hostname`) USING BTREE,
+	INDEX `session_id` (`session_id`) USING BTREE,
+	INDEX `counter` (`counter`) USING BTREE,
+	INDEX `response_text` (`response_text`) USING BTREE,
+	INDEX `response_code` (`response_code`) USING BTREE,
+	INDEX `city` (`city`) USING BTREE,
+	INDEX `platform` (`platform`) USING BTREE,
+	INDEX `host` (`host`) USING BTREE,
+	INDEX `statistic_entries_country_code_index` (`country_code`) USING BTREE,
+	INDEX `statistic_entries_country_index` (`country`) USING BTREE,
+	INDEX `statistic_entries_usage_type_index` (`usage_type`) USING BTREE,
+	INDEX `statistic_entries_wrong_host_index` (`wrong_host`) USING BTREE,
+	INDEX `statistic_entries_score_index` (`score`) USING BTREE,
+	INDEX `statistic_entries_report_count_index` (`report_count`) USING BTREE,
+	INDEX `statistic_entries_last_reported_at_index` (`last_reported_at`) USING BTREE,
+	INDEX `idx_query_hash_deleted_counter` (`deleted_at`, `counter`) USING BTREE,
+	INDEX `idx_perfect` (`deleted_at`, `counter`, `id`) USING BTREE,
+	INDEX `counter_deleted_at_query_hash_sha1_binary` (`query_hash_sha1_binary`, `deleted_at`, `counter`) USING BTREE,
+	FULLTEXT INDEX `referer` (`referer`),
+	FULLTEXT INDEX `query` (`query`),
+	CONSTRAINT `statistic_entries_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON UPDATE CASCADE ON DELETE SET NULL
+)
+COMMENT='Таблица для сбора статистики посещений'
+COLLATE='utf8mb4_unicode_ci'
+ENGINE=InnoDB;
+
+-------
