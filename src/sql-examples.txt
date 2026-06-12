@@ -109,3 +109,100 @@ FROM (`category_tree` `ct`
 JOIN `catalog_category_item_pivot` `cp` ON((`cp`.`catalog_category_id` = `ct`.`category_id`)))
 
 --------
+
+SELECT ROW_NUMBER() OVER (
+ORDER BY `t`.`interval_start`) AS `row_num`,`t`.`interval_start` AS `interval_start`,`t`.`interval_end` AS `interval_end`
+FROM (
+SELECT (CURDATE() + INTERVAL `intervals`.`minutes` MINUTE) AS `interval_start`,((CURDATE() + INTERVAL `intervals`.`minutes` MINUTE) + INTERVAL 5 MINUTE) AS `interval_end`
+FROM (
+SELECT ((`h`.`hour` * 60) + `m`.`minute`) AS `minutes`
+FROM ((
+SELECT 0 AS `hour` UNION
+SELECT 1 AS `1` UNION
+SELECT 2 AS `2` UNION
+SELECT 3 AS `3` UNION
+SELECT 4 AS `4` UNION
+SELECT 5 AS `5` UNION
+SELECT 6 AS `6` UNION
+SELECT 7 AS `7` UNION
+SELECT 8 AS `8` UNION
+SELECT 9 AS `9` UNION
+SELECT 10 AS `10` UNION
+SELECT 11 AS `11` UNION
+SELECT 12 AS `12` UNION
+SELECT 13 AS `13` UNION
+SELECT 14 AS `14` UNION
+SELECT 15 AS `15` UNION
+SELECT 16 AS `16` UNION
+SELECT 17 AS `17` UNION
+SELECT 18 AS `18` UNION
+SELECT 19 AS `19` UNION
+SELECT 20 AS `20` UNION
+SELECT 21 AS `21` UNION
+SELECT 22 AS `22` UNION
+SELECT 23 AS `23`) `h`
+JOIN (
+SELECT 0 AS `minute` UNION
+SELECT 5 AS `5` UNION
+SELECT 10 AS `10` UNION
+SELECT 15 AS `15` UNION
+SELECT 20 AS `20` UNION
+SELECT 25 AS `25` UNION
+SELECT 30 AS `30` UNION
+SELECT 35 AS `35` UNION
+SELECT 40 AS `40` UNION
+SELECT 45 AS `45` UNION
+SELECT 50 AS `50` UNION
+SELECT 55 AS `55`) `m`)
+WHERE (((`h`.`hour` * 60) + `m`.`minute`) < 1440)) `intervals`
+ORDER BY (CURDATE() + INTERVAL `intervals`.`minutes` MINUTE)) `t`
+
+-------
+
+BEGIN
+    DROP TEMPORARY TABLE IF EXISTS _agg;
+    CREATE TEMPORARY TABLE _agg ENGINE = MEMORY
+    SELECT 
+        FLOOR(UNIX_TIMESTAMP(created_at) / 300) AS interval_num,
+        ROUND(AVG(cpu_usage)) AS avg_cpu,
+        MAX(cpu_usage) AS max_cpu,
+        ROUND(AVG(current_ram_loading)) AS avg_ram,
+        MAX(current_ram_loading) AS max_ram,
+        ROUND(AVG(network_rx), 2) AS avg_network_rx,
+        MAX(network_rx) AS max_network_rx,
+        ROUND(AVG(network_tx), 2) AS avg_network_tx,
+        MAX(network_tx) AS max_network_tx,
+        AVG(current_network_loading) AS avg_network_loading,
+        AVG(last_ping) AS avg_last_ping
+    FROM remote_server_stats 
+    WHERE remote_server_id = p_server_id
+      AND created_at >= CURDATE()
+      AND created_at < CURDATE() + INTERVAL 1 DAY
+    GROUP BY interval_num;
+    
+    ALTER TABLE _agg ADD PRIMARY KEY (interval_num);
+    
+    SELECT 
+        n.n + 1 AS row_num,
+        CURDATE() + INTERVAL (n.n * 5) MINUTE AS interval_start,
+        CURDATE() + INTERVAL ((n.n + 1) * 5) MINUTE AS interval_end,
+        COALESCE(a.avg_cpu, 0) AS avg_cpu,
+        COALESCE(a.max_cpu, 0) AS max_cpu,
+        COALESCE(a.avg_ram, 0) AS avg_ram,
+        COALESCE(a.max_ram, 0) AS max_ram,
+        COALESCE(a.avg_network_rx, 0) AS avg_network_rx,
+        COALESCE(a.max_network_rx, 0) AS max_network_rx,
+        COALESCE(a.avg_network_tx, 0) AS avg_network_tx,
+        COALESCE(a.max_network_tx, 0) AS max_network_tx,
+        COALESCE(a.avg_network_loading, 0) AS avg_network_loading,
+        COALESCE(a.avg_last_ping, 0) AS avg_last_ping
+		  
+    FROM (
+        WITH RECURSIVE nums(n) AS (SELECT 0 UNION ALL SELECT n+1 FROM nums WHERE n < 287)
+        SELECT n FROM nums
+    ) n
+    LEFT JOIN _agg a ON a.interval_num = FLOOR(UNIX_TIMESTAMP(CURDATE()) / 300) + n.n
+    ORDER BY n.n;
+    
+    DROP TEMPORARY TABLE _agg;
+END
