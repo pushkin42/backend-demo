@@ -19,8 +19,7 @@ document.addEventListener('alpine:init', () => {
                     const link = document.createElement('a');
                     link.href = url;
 
-                    const contentDisposition = response.headers['content-disposition'];
-                    let fileName = 'downloaded_file.csv';
+                    const fileName = 'downloaded_file.csv';
 
                     link.setAttribute('download', fileName);
                     document.body.appendChild(link);
