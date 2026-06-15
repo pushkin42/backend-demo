@@ -7,4 +7,4 @@
 - club.js - AlpineJS компонент для страницы
 - routes.php - кусок web.php с маршрутами (можно использовать spatie/laravel-route-attributes и/или отдельный контроллер, но уровень задачи этого не требует)
 
-Демо-страница: [https://my.ipsam.ru/https://my.ipsam.ru/club-test](https://my.ipsam.ru/club-test)
+Демо-страница: [https://my.ipsam.ru/club-test](https://my.ipsam.ru/club-test)
